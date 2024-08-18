@@ -1,44 +1,31 @@
-from flask import Flask, request, jsonify
-from pymongo import MongoClient
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask
+from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+from pymongo import MongoClient
 
-# Load environment variables from .env file
+# Load environment variables from the .env file
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for the whole app
 
-# Load MongoDB URI from environment variable
+# Load the SECRET_KEY from environment variables
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
+# Load the MongoDB URI from environment variables
 mongo_uri = os.getenv('MONGO_URI')
 client = MongoClient(mongo_uri)
-db = client.Clinic  # Use the database name 'Clinic'
-users = db.login    # Use the collection name 'login'
 
-@app.route('/api/register', methods=['POST'])
-def register():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
+# Use the 'PersonalBudget' database
+db = client.PersonalBudget
 
-    if users.find_one({'email': email}):
-        return jsonify({"message": "User already exists"}), 400
+# Register blueprints for authentication
+from auth.register import register_bp
+from auth.login import login_bp
 
-    hashed_password = generate_password_hash(password)
-    users.insert_one({'email': email, 'password': hashed_password})
-    return jsonify({"message": "User registered successfully"}), 201
-
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
-
-    user = users.find_one({'email': email})
-    if user and check_password_hash(user['password'], password):
-        return jsonify({"message": "Login successful!"}), 200
-    else:
-        return jsonify({"message": "Invalid credentials"}), 401
+app.register_blueprint(register_bp, url_prefix='/api')
+app.register_blueprint(login_bp, url_prefix='/api')
 
 if __name__ == '__main__':
     app.run(debug=True)
